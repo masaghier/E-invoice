@@ -1,0 +1,43 @@
+[
+
+  {
+    "Code": "T13",
+    "Desc_en": "Stamping tax (percentage)",
+    "Desc_ar": "÷—Ì»Â «·œ„€Â (‰”»ÌÂ)"
+  },
+  {
+    "Code": "T14",
+    "Desc_en": "Stamping Tax (amount)",
+    "Desc_ar": "÷—Ì»Â «·œ„€Â (ﬁÿ⁄ÌÂ »„ﬁœ«— À«»  )"
+  },
+  {
+    "Code": "T15",
+    "Desc_en": "Entertainment tax",
+    "Desc_ar": "÷—Ì»… «·„·«ÂÏ"
+  },
+  {
+    "Code": "T16",
+    "Desc_en": "Resource development fee",
+    "Desc_ar": "—”„  ‰„ÌÂ «·„Ê«—œ"
+  },
+  {
+    "Code": "T17",
+    "Desc_en": "Table tax (percentage)",
+    "Desc_ar": "—”„ Œœ„…"
+  },
+  {
+    "Code": "T18",
+    "Desc_en": "Municipality Fees",
+    "Desc_ar": "—”„ «·„Õ·Ì« "
+  },
+  {
+    "Code": "T19",
+    "Desc_en": "Medical insurance fee",
+    "Desc_ar": "—”„ «· «„Ì‰ «·’ÕÏ"
+  },
+  {
+    "Code": "T20",
+    "Desc_en": "Other fees",
+    "Desc_ar": "—”Ê„ √Œ—Ï"
+  }
+]
