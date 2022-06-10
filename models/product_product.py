@@ -9,3 +9,13 @@ class Product(models.Model):
         ('EGS', 'EGS')
     ], string='Item type')
     item_code = fields.Char('Item code')
+
+
+class ProductTemplate(models.Model):
+    _inherit = 'product.template'
+
+    item_type = fields.Selection([
+        ('GS1', 'GS1'),
+        ('EGS', 'EGS')
+    ], string='Item type')
+    item_code = fields.Char('Item code')

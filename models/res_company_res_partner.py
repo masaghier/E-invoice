@@ -7,7 +7,7 @@ with path1.open() as activityCode:
     activity = json.load(activityCode)
 
 for i in range(len(activity)):
-    activity[i] = (activity[i]["code"], activity[i]["code"] + " " + activity[i]["Desc_ar"])
+    activity[i] = (activity[i]["code"], activity[i]["code"] + " - " + activity[i]["Desc_ar"])
 
 
 class ResCompany(models.Model):
@@ -16,7 +16,7 @@ class ResCompany(models.Model):
     branch_id = fields.Char('Branch Id')
     org_type = fields.Selection([('B', 'Business'),
                                  ('F', 'Foreign'),
-                                 ('P', 'Person')], string='Type')
+                                 ('P', 'Person')], string='Company Type')
     activity_code = fields.Selection(activity)
     client_id = fields.Char('Client id')
     client_secret_1 = fields.Char('Client secret 1')
