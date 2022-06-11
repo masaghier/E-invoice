@@ -1,14 +1,12 @@
 import json
-
 import requests
-
 import base64
-
 import ast
-
+import re
 import http.client as httplib
 
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 
 
 class AccountMove(models.Model):
@@ -44,12 +42,15 @@ class AccountMove(models.Model):
             "Authorization": "Basic %s" % base64_bytes
         }
         body = "grant_type=client_credentials"
-        conn = httplib.HTTPSConnection(loginurl, timeout=10)
-        conn.request("POST", loginmethod, body=body, headers=headers)
-        response = conn.getresponse()
-        data = response.read().decode('utf-8')
-        conn.close()
-        result = json.loads(data)
+        try:
+            conn = httplib.HTTPSConnection(loginurl, timeout=10)
+            conn.request("POST", loginmethod, body=body, headers=headers)
+            response = conn.getresponse()
+            data = response.read().decode('utf-8')
+            conn.close()
+            result = json.loads(data)
+        except:
+            raise ValidationError("Check the middleware state")
         return result.get("access_token")
 
     def get_state(self, uuid):
@@ -63,8 +64,11 @@ class AccountMove(models.Model):
             "Accept-Language" : "ar",
             "Content-Type"    : "application/json",
         }
-        c = httplib.HTTPSConnection(login_url)
-        c.request("GET", login_method, headers=headers)
+        try:
+            c = httplib.HTTPSConnection(login_url)
+            c.request("GET", login_method, headers=headers)
+        except:
+            raise ValidationError("Check the middleware state")
         res = c.getresponse()
         print(token)
         print("**************")
@@ -118,11 +122,14 @@ class AccountMove(models.Model):
                                           "amount": round((line.price_subtotal * tax.amount/100), 5), # round(tax.amount, 5), #edited by zizo
                                           "subType": tax.eta_tax_subtype,
                                           "rate": tax.amount})
-
+                if re.search("^EG", line.product_id.barcode):
+                    item_type = 'EGS'
+                else:
+                    item_type = 'GS1'
                 invoicelines.append({
                     "description": line.name,
-                    "itemType": line.product_id.item_type ,
-                    "itemCode": line.product_id.item_code,
+                    "itemType": item_type,
+                    "itemCode": line.product_id.barcode,
                     "unitType": line.product_uom_id.unit_type,
                     "quantity": line.quantity,
                     "internalCode": line.product_id.default_code,
@@ -190,8 +197,11 @@ class AccountMove(models.Model):
         jsoned = json.dumps(data)
         print("****JSON sent*****")
         print(jsoned)
-        req = requests.post(rec.company_id.signature_api_url, headers={'Content-Type': 'application/json'},
-                            data=jsoned, verify=False)
+        try:
+            req = requests.post(rec.company_id.signature_api_url, headers={'Content-Type': 'application/json'},
+                                data=jsoned, verify=False)
+        except:
+            raise ValidationError("Check the middleware state")
         rec.resp = json.loads(req.text)
         rec.fired = 1
         print("****response****")

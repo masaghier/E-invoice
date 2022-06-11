@@ -9,7 +9,6 @@
         'views/account_move_inherit.xml',
         'views/res_company_res_partner_inherit.xml',
         'views/uom_inherit.xml',
-        'views/product_product_inherit.xml',
         'views/account_tax_inherit.xml',
         'views/state_cron.xml',
     ],
