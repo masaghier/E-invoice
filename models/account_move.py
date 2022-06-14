@@ -64,6 +64,9 @@ class AccountMove(models.Model):
 
         AccountMove.system_api = login_url
         print(AccountMove.system_api)
+        print("**************")
+        print(token)
+        print("**************")
         headers = {
             "Authorization"   : f"Bearer {token}",
             "Accept"          : "application/json",
@@ -73,13 +76,14 @@ class AccountMove(models.Model):
         try:
             c = httplib.HTTPSConnection(login_url)
             c.request("GET", login_method, headers=headers)
+            print("try block response is : ")
+            print(c.getresponse())
         except:
             print("get_state() here's the error")
-            raise ValidationError("Check the middleware state")
+            raise ValidationError("Check the ETA Credentials !!!")
         res = c.getresponse()
-        print(token)
-        print("**************")
-        print(res)
+
+        print(res.read())
         r = res.read()
         print("********")
         print(r)
@@ -222,11 +226,11 @@ class AccountMove(models.Model):
     @api.depends('uuid')
     def get_uuid(self):
         for rec in self:
-            if self.fired:
+            if rec.fired:
                 at = ast.literal_eval(rec.resp)
                 if at["acceptedDocuments"]:
                     for doc in at["acceptedDocuments"]:
-                        if doc["internalId"] == rec.name: # zizo
+                        if doc["internalId"] == rec.name:  # zizo
                             rec.uuid = doc["uuid"]
                             print(f"*UUID*: {rec.uuid}")
                 elif at["rejectedDocuments"]:
@@ -237,7 +241,7 @@ class AccountMove(models.Model):
     @api.depends('eta_long_id')
     def get_long_id(self):
         for rec in self:
-            if self.fired:
+            if rec.fired:
                 at = ast.literal_eval(rec.resp)
                 if at["acceptedDocuments"]:
                     rec.eta_long_id = at["acceptedDocuments"][0]["longId"]
@@ -249,7 +253,7 @@ class AccountMove(models.Model):
     @api.depends('status', 'error_message')
     def get_status(self):
         for rec in self:
-            if self.fired:
+            if rec.fired:
                 at = ast.literal_eval(rec.resp)
                 if at["acceptedDocuments"]:
                     #rec.status = AccountMove.get_state(self, self.uuid)
