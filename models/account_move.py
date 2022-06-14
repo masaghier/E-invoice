@@ -5,38 +5,37 @@ import ast
 import re
 import http.client as httplib
 
-from odoo import models, fields, api
+from odoo import models, fields, api, tools
 from odoo.exceptions import ValidationError
+from cachetools import cached, TTLCache
 
 
 class AccountMove(models.Model):
     _inherit = "account.move"
 
-
-    # document_type = fields.Selection([
-    #     ('I', 'Invoice'),
-    #     ('C', 'Credit note'),
-    #     ('D', 'Debit note')
-    # ])
     resp = fields.Char()
     uuid = fields.Char('UUID', compute='get_uuid')
     eta_long_id = fields.Char(compute='get_long_id')
     fired = fields.Integer()
     status = fields.Char('Status', compute='get_status')
     error_message = fields.Text('Error message', compute='get_status')
+    system_api = ""
 
-    def get_token(key, secret, version, env_type):
+    cache = TTLCache(maxsize=100, ttl=3600)
+
+    @cached(cache)
+    def get_token(key, secret, env_type):
         auth = str(key + ":" + secret)
         message_bytes = auth.encode()
         base64_bytes = base64.b64encode(message_bytes).decode('ascii')
         loginurl = ""
         loginmethod = "/connect/token"
-        if env_type == "Pre Production":
+        if env_type == "preproduction":
             loginurl = "id.preprod.eta.gov.eg" #Identity Service
-            #systemAPI = "https://api.preprod.invoicing.eta.gov.eg"
+            #AccountMove.system_api = "https://api.preprod.invoicing.eta.gov.eg"
         else:
             loginurl = "id.eta.gov.eg"
-            #systemAPI = "https://api.invoicing.eta.gov.eg"
+            #AccountMove.system_api = "https://api.invoicing.eta.gov.eg"
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
             "Authorization": "Basic %s" % base64_bytes
@@ -54,10 +53,17 @@ class AccountMove(models.Model):
         return result.get("access_token")
 
     def get_state(self, uuid):
-        version = self.company_id.invoice_version
-        login_url = 'api.preprod.invoicing.eta.gov.eg'
+        environment = self.company_id.environment
         login_method = f'/api/v1.0/documents/{uuid}/details'
-        token = AccountMove.get_token(self.company_id.client_id, self.company_id.client_secret_1,version,"Pre Production")
+        token = AccountMove.get_token(self.company_id.client_id, self.company_id.client_secret_1, environment)
+        login_url = ""
+        if environment == "preproduction":
+            login_url = "api.preprod.invoicing.eta.gov.eg"
+        else:
+            login_url = "api.invoicing.eta.gov.eg"
+
+        AccountMove.system_api = login_url
+        print(AccountMove.system_api)
         headers = {
             "Authorization"   : f"Bearer {token}",
             "Accept"          : "application/json",
@@ -68,6 +74,7 @@ class AccountMove(models.Model):
             c = httplib.HTTPSConnection(login_url)
             c.request("GET", login_method, headers=headers)
         except:
+            print("get_state() here's the error")
             raise ValidationError("Check the middleware state")
         res = c.getresponse()
         print(token)
@@ -78,6 +85,7 @@ class AccountMove(models.Model):
         print(r)
         data = json.loads(r)
         status = data.get('status')
+        # ZIZO get error massage if invalid
         return status
 
     #Created by zizo
@@ -85,7 +93,7 @@ class AccountMove(models.Model):
         return {'res_model': 'ir.actions.act_url',
                 'type': 'ir.actions.act_url',
                 'target': '_blank',
-                'url': f'https://preprod.invoicing.eta.gov.eg/print/documents/{self.uuid}/share/{self.eta_long_id}'
+                'url': f'https://{AccountMove.system_api}/print/documents/{self.uuid}/share/{self.eta_long_id}'
                 }
 
     def action_send_einvoice(self):
@@ -98,7 +106,7 @@ class AccountMove(models.Model):
             # start edited by zizo
             sum_t1 = 0
             sum_t4 = 0
-            for i in self.invoice_line_ids:
+            for i in rec.invoice_line_ids: # changed rec instead self
                 if i.tax_ids:
                     for tax in i.tax_ids:
                         if tax.eta_tax_type == "T1":
@@ -172,7 +180,8 @@ class AccountMove(models.Model):
                                 "street": rec.partner_id.street or "",
                                 "buildingNumber": "1", "postalCode": rec.partner_id.zip or "", "floor": "", "room": "",
                                 "landmark": "",
-                                "additionalInformation": ""}, "type": rec.partner_id.org_type or "",
+                                "additionalInformation": ""},
+                    "type": rec.partner_id.org_type or "",
                     "id": rec.partner_id.vat or "",
                     "name": rec.partner_id.name or ""},
 
@@ -198,10 +207,13 @@ class AccountMove(models.Model):
         print("****JSON sent*****")
         print(jsoned)
         try:
-            req = requests.post(rec.company_id.signature_api_url, headers={'Content-Type': 'application/json'},
+            req = requests.post(f"{rec.company_id.signature_api_url}/api/SignDocument/postDocs",
+                                headers={'Content-Type': 'application/json'},
                                 data=jsoned, verify=False)
         except:
+            print("action_send_invoice() here's the error")
             raise ValidationError("Check the middleware state")
+
         rec.resp = json.loads(req.text)
         rec.fired = 1
         print("****response****")
@@ -213,8 +225,10 @@ class AccountMove(models.Model):
             if self.fired:
                 at = ast.literal_eval(rec.resp)
                 if at["acceptedDocuments"]:
-                    rec.uuid = at["acceptedDocuments"][0]["uuid"]
-                    print(f"*UUID*: {rec.uuid}")
+                    for doc in at["acceptedDocuments"]:
+                        if doc["internalId"] == rec.name: # zizo
+                            rec.uuid = doc["uuid"]
+                            print(f"*UUID*: {rec.uuid}")
                 elif at["rejectedDocuments"]:
                     rec.uuid = ''
             else:
