@@ -1,9 +1,11 @@
+import datetime
 import json
 import requests
 import base64
 import ast
 import re
 import http.client as httplib
+
 
 from odoo import models, fields, api, tools
 from odoo.exceptions import ValidationError
@@ -14,10 +16,13 @@ class AccountMove(models.Model):
     _inherit = "account.move"
 
     resp = fields.Char()
-    uuid = fields.Char('UUID', compute='get_uuid')
-    eta_long_id = fields.Char(compute='get_long_id')
+    # uuid = fields.Char('UUID', compute='get_uuid')
+    uuid = fields.Char('UUID')
+    # eta_long_id = fields.Char(compute='get_long_id')
+    eta_long_id = fields.Char()
+    submission_id = fields.Char()
     fired = fields.Integer()
-    status = fields.Char('Status', compute='get_status')
+    status = fields.Char('ETA Status', compute='get_status', store=True)
     error_message = fields.Text('Error message', compute='get_status')
     system_api = ""
 
@@ -77,27 +82,31 @@ class AccountMove(models.Model):
             c = httplib.HTTPSConnection(login_url)
             c.request("GET", login_method, headers=headers)
             print("try block response is : ")
-            print(c.getresponse())
         except:
             print("get_state() here's the error")
             raise ValidationError("Check the ETA Credentials !!!")
         res = c.getresponse()
-
-        print(res.read())
-        r = res.read()
+        #print(res.read())
+        #r = res.read()
         print("********")
-        print(r)
-        data = json.loads(r)
-        status = data.get('status')
+        #print(r)
+        data = json.loads(res.read())
+        print(data)
+        status = data.get("status")
         # ZIZO get error massage if invalid
         return status
 
     #Created by zizo
     def eta_print(self):
+        environment = self.company_id.environment
+        if environment == "preproduction":
+            sys_api = "preprod.invoicing.eta.gov.eg"
+        else:
+            sys_api = "invoicing.eta.gov.eg"
         return {'res_model': 'ir.actions.act_url',
                 'type': 'ir.actions.act_url',
                 'target': '_blank',
-                'url': f'https://{AccountMove.system_api}/print/documents/{self.uuid}/share/{self.eta_long_id}'
+                'url': f'https://{sys_api}/print/documents/{self.uuid}/share/{self.eta_long_id}'
                 }
 
     def action_send_einvoice(self):
@@ -220,49 +229,76 @@ class AccountMove(models.Model):
 
         rec.resp = json.loads(req.text)
         rec.fired = 1
+        at = ast.literal_eval(rec.resp)
+        rec.submission_id = at['submissionId']
+        if at["acceptedDocuments"]:
+            for doc in at["acceptedDocuments"]:
+                if doc["internalId"] == rec.name:  # zizo
+                    rec.uuid = doc["uuid"]
+                    rec.eta_long_id = doc["longId"]
+                    rec.status = 'Submitted'
+                    print(f"*UUID*: {rec.uuid}")
+        elif at["rejectedDocuments"]:
+            for doc_rtn in at["rejectedDocuments"]:
+                print(doc_rtn["internalId"])
+                if doc_rtn["internalId"] == rec.name:
+                    rec.error_message = doc_rtn['error']['details']
+                    rec.status = 'Rejected'
+                    print(doc_rtn['error']['details'])
+                    print("****errMsg****")
+                    print(rec.error_message)
+                    print(rec.status)
         print("****response****")
         print(rec.resp)
 
-    @api.depends('uuid')
-    def get_uuid(self):
-        for rec in self:
-            if rec.fired:
-                at = ast.literal_eval(rec.resp)
-                if at["acceptedDocuments"]:
-                    for doc in at["acceptedDocuments"]:
-                        if doc["internalId"] == rec.name:  # zizo
-                            rec.uuid = doc["uuid"]
-                            print(f"*UUID*: {rec.uuid}")
-                elif at["rejectedDocuments"]:
-                    rec.uuid = ''
-            else:
-                rec.uuid = ''
-
-    @api.depends('eta_long_id')
-    def get_long_id(self):
-        for rec in self:
-            if rec.fired:
-                at = ast.literal_eval(rec.resp)
-                if at["acceptedDocuments"]:
-                    rec.eta_long_id = at["acceptedDocuments"][0]["longId"]
-                elif at["rejectedDocuments"]:
-                    rec.eta_long_id = ''
-            else:
-                rec.eta_long_id = ''
+    # @api.depends('uuid')
+    # def get_uuid(self):
+    #     for rec in self:
+    #         if rec.fired:
+    #             at = ast.literal_eval(rec.resp)
+    #             if at["acceptedDocuments"]:
+    #                 for doc in at["acceptedDocuments"]:
+    #                     if doc["internalId"] == rec.name:  # zizo
+    #                         rec.uuid = doc["uuid"]
+    #                         print(f"*UUID*: {rec.uuid}")
+    #             elif at["rejectedDocuments"]:
+    #                 rec.uuid = ''
+    #         else:
+    #             rec.uuid = ''
+    #
+    # @api.depends('eta_long_id')
+    # def get_long_id(self):
+    #     for rec in self:
+    #         if rec.fired:
+    #             at = ast.literal_eval(rec.resp)
+    #             if at["acceptedDocuments"]:
+    #                 rec.eta_long_id = at["acceptedDocuments"][0]["longId"]
+    #             elif at["rejectedDocuments"]:
+    #                 rec.eta_long_id = ''
+    #         else:
+    #             rec.eta_long_id = ''
 
     @api.depends('status', 'error_message')
     def get_status(self):
+        now = datetime.date.today()
+
         for rec in self:
-            if rec.fired:
+            if not rec.invoice_date:
+                rec.status = ''
+                rec.error_message = ''
+            elif rec.invoice_date >= (now - datetime.timedelta(days=3)) and rec.fired:
                 at = ast.literal_eval(rec.resp)
                 if at["acceptedDocuments"]:
                     #rec.status = AccountMove.get_state(self, self.uuid)
                     rec.status = rec.get_state(rec.uuid)
                     rec.error_message = ''
                 elif at["rejectedDocuments"]:
-                    rec.status = ''
-                    rec.error_message = at["rejectedDocuments"][0]["error"]["details"][0]["message"]
+                    rec.status = 'Rejected'
+                    rec.error_message = at["rejectedDocuments"][0]["error"]
             else:
                 rec.status = ''
                 rec.error_message = ''
+        # else:
+        #     rec.status = ''
+        #     rec.error_message = ''
 

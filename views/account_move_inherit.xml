@@ -16,7 +16,7 @@
             <xpath expr="//button[@name='action_register_payment']" position="after">
                 <button name="action_send_einvoice" id="account_einvoice_send_btn"
                         type="object" class="oe_highlight btn-warning"
-                        attrs="{'invisible': ['|', '|', ('state', '!=', 'posted'), ('payment_state', 'not in', ('not_paid', 'partial')), ('move_type', 'not in', ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt'))]}"
+                        attrs="{'invisible': ['|', '|', ('state', 'not in', ('posted', 'paid')), ('status', 'in', ('Valid', 'Canceled')), ('move_type', 'not in', ('out_invoice', 'out_refund', 'in_invoice', 'in_refund', 'out_receipt', 'in_receipt'))]}"
                         string=" Send E-invoice"
                         icon="fa-send"
                         groups="account.group_account_invoice"/>
@@ -62,7 +62,11 @@
             <field name="inherit_id" ref="account.view_out_invoice_tree" />
             <field name="arch" type="xml">
                 <field name="state" position="before">
-                    <field name="status"/>
+                    <field name="status" widget="badge"
+                           decoration-success= "status == 'Valid'"
+                           decoration-warning = "status == 'Canceled'"
+                           decoration-danger = "status == 'Rejected'"
+                    />
                 </field>
             </field>
     </record>
