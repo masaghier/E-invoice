@@ -22,8 +22,8 @@ class AccountMove(models.Model):
     eta_long_id = fields.Char()
     submission_id = fields.Char()
     fired = fields.Integer()
-    status = fields.Char('ETA Status', compute='get_status', store=True)
-    error_message = fields.Text('Error message', compute='get_status')
+    status = fields.Char('ETA Status') #, compute='get_status', store=True
+    error_message = fields.Text('Error message')
     system_api = ""
 
     cache = TTLCache(maxsize=100, ttl=3600)
@@ -109,6 +109,7 @@ class AccountMove(models.Model):
                 'url': f'https://{sys_api}/print/documents/{self.uuid}/share/{self.eta_long_id}'
                 }
 
+    #@api.depends("status", "error_messsa")
     def action_send_einvoice(self):
         data = []
         for rec in self:
@@ -251,34 +252,7 @@ class AccountMove(models.Model):
         print("****response****")
         print(rec.resp)
 
-    # @api.depends('uuid')
-    # def get_uuid(self):
-    #     for rec in self:
-    #         if rec.fired:
-    #             at = ast.literal_eval(rec.resp)
-    #             if at["acceptedDocuments"]:
-    #                 for doc in at["acceptedDocuments"]:
-    #                     if doc["internalId"] == rec.name:  # zizo
-    #                         rec.uuid = doc["uuid"]
-    #                         print(f"*UUID*: {rec.uuid}")
-    #             elif at["rejectedDocuments"]:
-    #                 rec.uuid = ''
-    #         else:
-    #             rec.uuid = ''
-    #
-    # @api.depends('eta_long_id')
-    # def get_long_id(self):
-    #     for rec in self:
-    #         if rec.fired:
-    #             at = ast.literal_eval(rec.resp)
-    #             if at["acceptedDocuments"]:
-    #                 rec.eta_long_id = at["acceptedDocuments"][0]["longId"]
-    #             elif at["rejectedDocuments"]:
-    #                 rec.eta_long_id = ''
-    #         else:
-    #             rec.eta_long_id = ''
-
-    @api.depends('status', 'error_message')
+    #@api.depends('status', 'error_message')
     def get_status(self):
         now = datetime.date.today()
 

@@ -64,8 +64,8 @@
                 <field name="state" position="before">
                     <field name="status" widget="badge"
                            decoration-success= "status == 'Valid'"
-                           decoration-warning = "status == 'Canceled'"
-                           decoration-danger = "status == 'Rejected'"
+                           decoration-warning= "status == 'Canceled'"
+                           decoration-danger= "status == 'Rejected'"
                     />
                 </field>
             </field>

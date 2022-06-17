@@ -8,7 +8,7 @@
        <field name="code">model.get_status()</field>
        <field name="user_id" ref="base.user_root"/>
        <field name='interval_number'>2</field>
-       <field name='interval_type'>hours</field>
+       <field name='interval_type'>minutes</field>
        <field name="numbercall">36</field>
        <field name="doall" eval="False"/>
    </record>
