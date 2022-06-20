@@ -7,9 +7,10 @@ import re
 import http.client as httplib
 
 
+
 from odoo import models, fields, api, tools
 from odoo.exceptions import ValidationError
-from cachetools import cached, TTLCache
+# from cachetools import cached, TTLCache
 
 
 class AccountMove(models.Model):
@@ -26,9 +27,9 @@ class AccountMove(models.Model):
     error_message = fields.Text('Error message')
     system_api = ""
 
-    cache = TTLCache(maxsize=100, ttl=3600)
-
-    @cached(cache)
+    # cache = TTLCache(maxsize=100, ttl=3600)
+    #
+    # @cached(cache)
     def get_token(key, secret, env_type):
         auth = str(key + ":" + secret)
         message_bytes = auth.encode()
@@ -109,6 +110,7 @@ class AccountMove(models.Model):
                 'url': f'https://{sys_api}/print/documents/{self.uuid}/share/{self.eta_long_id}'
                 }
 
+    export_data = ''
     #@api.depends("status", "error_messsa")
     def action_send_einvoice(self):
         data = []
@@ -216,7 +218,7 @@ class AccountMove(models.Model):
                 # {"taxType": "T1", "amount": self.amount_by_group}
                 "taxTotals": tax_totals,
                 "totalAmount": rec.amount_total, "extraDiscountAmount": 0.0, "totalItemsDiscountAmount": 0})
-
+        AccountMove.export_data = data
         jsoned = json.dumps(data)
         print("****JSON sent*****")
         print(jsoned)
@@ -275,4 +277,26 @@ class AccountMove(models.Model):
         # else:
         #     rec.status = ''
         #     rec.error_message = ''
+
+    def export_data(self):
+        with open('data.json', 'r+') as f:
+            json.dump(AccountMove.export_data, f)
+            result = f.read()
+        # output is where you have the content of your file, it can be
+        # any type of content
+        # encode
+        # get base url
+        base_url = self.env['ir.config_parameter'].get_param('web.base.url')
+        attachment_obj = self.env['ir.attachment']
+        # create attachment
+        attachment_id = attachment_obj.create(
+            {'name': "name", 'datas': result})
+        # prepare download url
+        download_url = '/web/content/' + str(attachment_id.id) + '?download=true'
+        # download
+        return {
+            "type": "ir.actions.act_url",
+            "url": str(base_url) + str(download_url),
+            "target": "new",
+        }
 
